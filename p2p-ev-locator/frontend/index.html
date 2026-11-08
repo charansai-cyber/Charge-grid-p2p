@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChargeGrid P2P — Emergency EV Charging &amp; Station Locator</title>
+  <meta name="description" content="Peer-to-Peer Emergency EV Charging &amp; Commercial Station Locator with instant map access, Smart Calculator, and triggered Gmail OTP authentication." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2310b981'/%3E%3Cstop offset='100%25' stop-color='%230284c7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='32,4 58,19 58,45 32,60 6,45 6,19' fill='url(%23g)'/%3E%3Cpath d='M35 14L20 35h11l-3 15 16-21H33l2-15z' fill='%23ffffff'/%3E%3C/svg%3E" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet" />
+  <!-- Leaflet 1.9.4 CSS (OpenStreetMap) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <a href="#main-workspace" class="skip-link">Skip to main content</a>
+
+  <!-- Top Navigation Bar (No Login Wall; Triggered Auth + Account Dropdown) -->
+  <header class="topbar" role="banner">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg class="logo-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="cg-hex-grad" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#10B981" />
+                <stop offset="55%" stop-color="#059669" />
+                <stop offset="100%" stop-color="#0284C7" />
+              </linearGradient>
+              <linearGradient id="cg-bolt-grad" x1="20" y1="12" x2="44" y2="52" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#FFFFFF" />
+                <stop offset="100%" stop-color="#A7F3D0" />
+              </linearGradient>
+            </defs>
+            <!-- Outer Hexagonal Energy Shield -->
+            <polygon points="32,3 59,18.5 59,45.5 32,61 5,45.5 5,18.5" fill="url(#cg-hex-grad)" stroke="rgba(255,255,255,0.28)" stroke-width="2" />
+            <!-- Inner Circuit Ring -->
+            <circle cx="32" cy="32" r="21" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" stroke-dasharray="4 3" />
+            <!-- P2P Connection Nodes -->
+            <circle cx="32" cy="11" r="2.3" fill="#38BDF8" />
+            <circle cx="50" cy="42" r="2.3" fill="#A7F3D0" />
+            <circle cx="14" cy="42" r="2.3" fill="#A7F3D0" />
+            <!-- High-Voltage Lightning Bolt -->
+            <path d="M35.5 13L19.5 34.5H31L27.5 51L44.5 29.5H33L35.5 13Z" fill="url(#cg-bolt-grad)" />
+          </svg>
+        </div>
+        <div class="brand-text-wrap">
+          <div class="brand-title-row">
+            <span class="brand-title">Charge<span class="brand-title-accent">Grid</span></span>
+            <span class="badge-pill"><span class="live-pulse-dot"></span> P2P &amp; Fast EV</span>
+          </div>
+          <p class="brand-sub">Emergency Roadside P2P Host Network &amp; Commercial EV Station Radar</p>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <!-- Role Mode Switcher (Any user can act as Customer or Provider interchangeably) -->
+        <div class="role-tabs" role="tablist" aria-label="Switch between Customer, Nearby EV Stations, and Electricity Provider mode">
+          <button
+            type="button"
+            id="tab-customer-mode"
+            class="role-tab active"
+            role="tab"
+            aria-selected="true"
+          >
+            🚗 Find Emergency Charge
+          </button>
+          <button
+            type="button"
+            id="tab-ev-stations-mode"
+            class="role-tab"
+            role="tab"
+            aria-selected="false"
+          >
+            ⚡ Nearby EV Stations
+          </button>
+          <button
+            type="button"
+            id="tab-provider-mode"
+            class="role-tab"
+            role="tab"
+            aria-selected="false"
+          >
+            🔌 Become a Provider
+          </button>
+        </div>
+
+        <!-- Dark Mode by Default + Light Mode Toggle -->
+        <button
+          type="button"
+          id="btn-theme-toggle"
+          class="btn btn-outline btn-sm"
+          aria-label="Toggle dark and light theme"
+        >
+          <span id="theme-icon" aria-hidden="true">☀️</span>
+          <span id="theme-text">Light Mode</span>
+        </button>
+
+        <!-- Top-Right Account Dropdown ("History", "Logout", "Delete Account") -->
+        <div class="account-menu-wrap" id="account-menu-wrap">
+          <button
+            type="button"
+            id="btn-account-dropdown"
+            class="btn btn-secondary btn-sm account-trigger"
+            aria-haspopup="true"
+            aria-expanded="false"
+          >
+            <span id="auth-indicator-dot" class="dot-offline" aria-hidden="true"></span>
+            <span id="account-btn-label">Account</span>
+            <span aria-hidden="true">▾</span>
+          </button>
+
+          <div id="account-dropdown-menu" class="dropdown-panel hidden" role="menu" aria-label="Account menu">
+            <div class="dropdown-user-box">
+              <span class="dropdown-small">Status</span>
+              <strong id="dropdown-user-status">Guest (Browsing Open Map)</strong>
+            </div>
+            <button type="button" id="menu-btn-history" class="dropdown-action" role="menuitem">
+              📜 History
+            </button>
+            <button type="button" id="menu-btn-logout" class="dropdown-action" role="menuitem">
+              🚪 Logout
+            </button>
+            <button type="button" id="menu-btn-delete-account" class="dropdown-action dropdown-danger" role="menuitem">
+              🗑️ Delete Account
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace (Immediately Accessible Without Login Wall) -->
+  <main id="main-workspace" class="container workspace">
+    <!-- Toast / Feedback Banner -->
+    <div id="toast-banner" class="toast-banner hidden" role="status" aria-live="polite"></div>
+    <!-- Professional EV Telemetry & Status Ribbon -->
+    <div class="telemetry-ribbon" aria-label="Live network overview">
+      <div class="telemetry-item">
+        <span class="telemetry-icon">🛡️</span>
+        <div>
+          <span class="telemetry-label">Zero Login Wall</span>
+          <strong class="telemetry-val">Instant Map &amp; Station Radar</strong>
+        </div>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-icon">🏠</span>
+        <div>
+          <span class="telemetry-label">Verified P2P Hosts</span>
+          <strong class="telemetry-val">Houses · Shops · Guarded Parking</strong>
+        </div>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-icon">⚡</span>
+        <div>
+          <span class="telemetry-label">Smart Pricing Formula</span>
+          <strong class="telemetry-val">(Units × Area Tariff) + ₹200 Base</strong>
+        </div>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-icon">🔒</span>
+        <div>
+          <span class="telemetry-label">Privacy Protected</span>
+          <strong class="telemetry-val">10-Digit Phone Unlocks on Contact</strong>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ================================================================== -->
+    <!-- CUSTOMER & PUBLIC MAP VIEW (Default Open View — Zero Login Wall)   -->
+    <!-- ================================================================== -->
+    <section id="section-customer-view" aria-labelledby="heading-customer">
+      <div class="workspace-grid">
+        <!-- Left Column: Interactive Map & Station Filters -->
+        <div class="col-map">
+          <div class="card map-card">
+            <div class="card-header">
+              <div>
+                <span class="eyebrow">Instant Open Map (No Login Required to Browse)</span>
+                <h1 id="heading-customer" class="card-title">Nearby P2P Hosts &amp; Commercial EV Stations</h1>
+              </div>
+              <div class="btn-group">
+                <button type="button" id="btn-locate-me" class="btn btn-primary btn-xs">
+                  📍 My GPS
+                </button>
+                <button type="button" id="btn-refresh-pins" class="btn btn-outline btn-xs">
+                  🔄 Refresh Map
+                </button>
+              </div>
+            </div>
+
+            <!-- Address / City Search Bar -->
+            <form id="form-map-search" class="search-bar" novalidate>
+              <label for="input-map-search" class="sr-only">Search city or area</label>
+              <input
+                type="text"
+                id="input-map-search"
+                placeholder="Search city or highway (e.g., Chandigarh, Ludhiana, Mohali, Amritsar)..."
+              />
+              <button type="submit" id="btn-map-search" class="btn btn-secondary btn-sm">
+                Search
+              </button>
+            </form>
+
+            <!-- One-Tap Punjab & North India EV Hub Quick-Jumps -->
+            <div class="city-hub-bar" role="group" aria-label="Quick jump to major EV hubs">
+              <span class="hub-label">Quick Hubs:</span>
+              <button type="button" class="hub-chip active" data-lat="30.7418" data-lng="76.7825" data-city="Chandigarh">📍 Chandigarh</button>
+              <button type="button" class="hub-chip" data-lat="30.7124" data-lng="76.7231" data-city="Mohali">📍 Mohali</button>
+              <button type="button" class="hub-chip" data-lat="30.8975" data-lng="75.8412" data-city="Ludhiana">📍 Ludhiana</button>
+              <button type="button" class="hub-chip" data-lat="31.2982" data-lng="75.6415" data-city="Jalandhar">📍 Jalandhar</button>
+              <button type="button" class="hub-chip" data-lat="31.6528" data-lng="74.8622" data-city="Amritsar">📍 Amritsar</button>
+              <button type="button" class="hub-chip" data-lat="30.3398" data-lng="76.3869" data-city="Patiala">📍 Patiala</button>
+            </div>
+
+            <!-- Smart Nearest Emergency Rescue Match Strip -->
+            <div id="nearest-rescue-strip" class="nearest-rescue-strip" aria-live="polite"></div>
+
+            <!-- Map Legend & Layer Filter Option -->
+            <div class="map-legend">
+              <span><i class="legend-dot dot-user"></i> Your EV</span>
+              <span><i class="legend-dot dot-p2p"></i> P2P Host (House / Shop / Parking)</span>
+              <span><i class="legend-dot dot-commercial"></i> Nearby EV Station</span>
+              <div class="map-filter-pills" role="group" aria-label="Filter map pins">
+                <button type="button" id="filter-map-all" class="filter-pill active">All Pins</button>
+                <button type="button" id="filter-map-p2p" class="filter-pill">🏠 P2P Hosts</button>
+                <button type="button" id="filter-map-stations" class="filter-pill">⚡ EV Stations Only</button>
+              </div>
+            </div>
+
+            <!-- Leaflet Map Container -->
+            <div id="ev-map" class="map-canvas" role="region" aria-label="EV charging stations and P2P hosts map"></div>
+
+            <div class="map-footer">
+              <span id="map-coord-readout">Center: 30.7418, 76.7825 (Punjab, India)</span>
+              <span id="osm-station-status">Loaded commercial &amp; P2P stations</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Smart Calculator & P2P / Commercial Station Cards -->
+        <div class="col-sidebar">
+          <!-- Smart Calculator Card -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <span class="eyebrow">Emergency Energy &amp; Cost Estimator</span>
+                <h2 class="card-title">🔋 Smart EV Charge Calculator</h2>
+              </div>
+              <span class="badge badge-emerald">+ ₹200 Base Fee</span>
+            </div>
+
+            <form id="form-smart-calculator" novalidate>
+              <!-- One-Tap Popular EV Model Presets -->
+              <div class="ev-preset-bar" role="group" aria-label="Popular EV vehicle presets">
+                <span class="hub-label">EV Presets:</span>
+                <button type="button" class="ev-preset-chip active" data-model="Tata Nexon EV" data-cap="30" data-eff="6.8">Nexon EV (30kWh)</button>
+                <button type="button" class="ev-preset-chip" data-model="Tata Punch EV LR" data-cap="35" data-eff="7.2">Punch EV (35kWh)</button>
+                <button type="button" class="ev-preset-chip" data-model="Tata Tiago EV" data-cap="24" data-eff="7.5">Tiago EV (24kWh)</button>
+                <button type="button" class="ev-preset-chip" data-model="MG ZS EV" data-cap="50.3" data-eff="6.5">MG ZS EV (50.3kWh)</button>
+                <button type="button" class="ev-preset-chip" data-model="Mahindra XUV400" data-cap="39.4" data-eff="6.6">XUV400 (39.4kWh)</button>
+                <button type="button" class="ev-preset-chip" data-model="BYD Atto 3" data-cap="49.9" data-eff="6.7">BYD Atto 3 (50kWh)</button>
+              </div>
+
+              <!-- Live Visual Battery SoC Gauge -->
+              <div class="battery-gauge-box" aria-hidden="true">
+                <div class="battery-gauge-header">
+                  <span id="gauge-current-label">Current: 15%</span>
+                  <span id="gauge-gain-label" class="gauge-gain-pill">+50% Charge (+15.0 kWh · ~102 km range)</span>
+                  <span id="gauge-desired-label">Target: 65%</span>
+                </div>
+                <div class="battery-bar-track">
+                  <div id="battery-bar-current" class="battery-bar-current" style="width: 15%;"></div>
+                  <div id="battery-bar-added" class="battery-bar-added" style="left: 15%; width: 50%;"></div>
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label for="calc-car-model">1. Car Model *</label>
+                  <input
+                    type="text"
+                    id="calc-car-model"
+                    value="Tata Nexon EV"
+                    placeholder="e.g., Tata Nexon EV, MG ZS EV"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="calc-battery-cap">2. Battery Capacity (kWh) *</label>
+                  <input
+                    type="number"
+                    id="calc-battery-cap"
+                    min="1"
+                    max="250"
+                    step="0.5"
+                    value="30"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label for="calc-current-pct">3. Current Battery (%) *</label>
+                  <input
+                    type="number"
+                    id="calc-current-pct"
+                    min="0"
+                    max="99"
+                    step="1"
+                    value="15"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="calc-desired-pct">4. Desired Charge (%) *</label>
+                  <input
+                    type="number"
+                    id="calc-desired-pct"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value="65"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label for="calc-unit-cost">Local Area Unit Cost (₹/kWh)</label>
+                  <input
+                    type="number"
+                    id="calc-unit-cost"
+                    min="1"
+                    max="100"
+                    step="0.5"
+                    value="8.00"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="calc-socket-speed">Charger Output Speed</label>
+                  <select id="calc-socket-speed">
+                    <option value="3.0" selected>15A Domestic Socket (~3.0 kW)</option>
+                    <option value="7.2">AC Wallbox Charger (~7.2 kW)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="calc-validation-error" class="alert-error hidden" role="alert"></div>
+
+              <!-- Smart Calculator Live Output -->
+              <div class="calc-result-panel" aria-live="polite">
+                <div class="calc-row">
+                  <span>Units Needed (kWh):</span>
+                  <strong id="out-units-needed" class="mono">15.00 kWh</strong>
+                </div>
+                <div class="calc-row">
+                  <span>Estimated Driving Range Added:</span>
+                  <strong id="out-range-added" class="mono" style="color:var(--blue);">+ ~102 km</strong>
+                </div>
+                <div class="calc-row">
+                  <span>Local Area Unit Cost:</span>
+                  <span id="out-unit-cost" class="mono">₹8.00 / Unit</span>
+                </div>
+                <div class="calc-row">
+                  <span>Fixed Emergency Service Fee:</span>
+                  <span class="mono">₹200.00</span>
+                </div>
+                <div class="calc-row calc-total-row">
+                  <span>Estimated Total Cost:</span>
+                  <strong id="out-total-cost" class="mono total-price">₹320.00</strong>
+                </div>
+                <div class="calc-formula-bar">
+                  <span id="out-formula-text">Total Cost = (15.00 Units × ₹8.00) + ₹200 = ₹320.00</span>
+                  <span id="out-est-time" class="time-pill">⏱️ ~300 mins</span>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Directory Switcher Tabs: P2P Providers vs Nearby EV Stations -->
+          <div class="card" id="directory-card">
+            <div class="card-header">
+              <div>
+                <span class="eyebrow">Instant Roadside Directory</span>
+                <h2 class="card-title">📍 Choose P2P Hosts or Nearby EV Stations</h2>
+              </div>
+              <div class="directory-switch-group" role="tablist" aria-label="Switch between P2P Providers and Nearby EV Stations list">
+                <button type="button" id="btn-dir-p2p" class="btn btn-primary btn-xs" role="tab" aria-selected="true">
+                  🏠 P2P Hosts (<span id="host-count-badge">0</span>)
+                </button>
+                <button type="button" id="btn-dir-stations" class="btn btn-outline btn-xs" role="tab" aria-selected="false">
+                  ⚡ Nearby EV Stations (<span id="station-count-badge">0</span>)
+                </button>
+              </div>
+            </div>
+
+            <!-- Panel 1: Nearby P2P Hosts -->
+            <div id="panel-dir-p2p">
+              <p class="helper-text">
+                Phone numbers are <strong>never</strong> shown on the public map. Click <strong>"Contact for Charge"</strong> to verify via Gmail OTP and start charging.
+              </p>
+              <div id="hosts-list-container" class="hosts-list" role="list"></div>
+            </div>
+
+            <!-- Panel 2: Nearby Commercial & Public EV Charging Stations -->
+            <div id="panel-dir-stations" class="hidden">
+              <div class="station-filter-bar">
+                <label for="select-station-connector" class="sr-only">Filter EV stations by connector</label>
+                <select id="select-station-connector">
+                  <option value="all">All Connector Types (CCS2, Type-2 AC, CHAdeMO)</option>
+                  <option value="CCS2">CCS2 DC Fast Chargers Only</option>
+                  <option value="Type-2">Type-2 AC Chargers</option>
+                </select>
+              </div>
+              <p class="helper-text">
+                Verified public &amp; commercial fast-charging stations ordered by distance from your EV. Click <strong>"Locate on Map"</strong> to highlight the charger or <strong>"Navigate"</strong> for turn-by-turn directions.
+              </p>
+              <div id="ev-stations-list-container" class="hosts-list" role="list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================== -->
+    <!-- ELECTRICITY PROVIDER FLOW (Select Exact Location & "Save Address") -->
+    <!-- ================================================================== -->
+    <section id="section-provider-view" class="hidden" aria-labelledby="heading-provider">
+      <div class="workspace-grid">
+        <!-- Left: Provider Map Pin Selector -->
+        <div class="col-map">
+          <div class="card map-card">
+            <div class="card-header">
+              <div>
+                <span class="eyebrow">Step 1: Pin Your Exact Service Location</span>
+                <h2 id="heading-provider" class="card-title">📌 Click on the Map to Place Your Host Pin</h2>
+              </div>
+              <button type="button" id="btn-provider-gps" class="btn btn-outline btn-xs">
+                📍 Use My Current GPS
+              </button>
+            </div>
+            <p class="helper-text">
+              Click anywhere on the map below to set the exact coordinates of your <strong>House</strong>, <strong>Shop</strong>, or <strong>Parking Area</strong>.
+            </p>
+            <div id="provider-map" class="map-canvas" role="region" aria-label="Select provider location on map"></div>
+          </div>
+        </div>
+
+        <!-- Right: Provider Details Form & "Save Address" (Triggers Auth if Guest) -->
+        <div class="col-sidebar">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <span class="eyebrow">Step 2: Property &amp; Contact Details</span>
+                <h2 class="card-title">🔌 Register as an Electricity Provider</h2>
+              </div>
+              <span id="provider-saved-badge" class="badge badge-neutral">Unsaved</span>
+            </div>
+
+            <div class="privacy-callout">
+              <strong>🔒 Strict Phone Number Privacy:</strong>
+              Your 10-digit mobile number is never displayed on the public map. Public visitors only see a <strong>"Contact for Charge"</strong> button; your number is revealed only to a logged-in customer who initiates a charging session.
+            </div>
+
+            <form id="form-provider-save" novalidate>
+              <div class="field">
+                <label for="prov-host-name">Host / Listing Display Name *</label>
+                <input
+                  type="text"
+                  id="prov-host-name"
+                  placeholder="e.g., Gill Residence Driveway or Sharma Shop"
+                  required
+                />
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label for="prov-property-type">Property Type *</label>
+                  <select id="prov-property-type" required>
+                    <option value="House">🏠 House</option>
+                    <option value="Shop">🏪 Shop</option>
+                    <option value="Parking Area">🅿️ Parking Area</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="prov-phone">10-Digit Mobile Number *</label>
+                  <input
+                    type="tel"
+                    id="prov-phone"
+                    placeholder="9876543210"
+                    maxlength="10"
+                    inputmode="numeric"
+                    required
+                  />
+                  <small class="field-hint">Strictly 10 digits (6–9 start, no +91)</small>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="prov-address">Address / Landmark Description *</label>
+                <input
+                  type="text"
+                  id="prov-address"
+                  placeholder="e.g., House 142, Sector 17-C, Chandigarh"
+                  required
+                />
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label for="prov-lat">Selected Latitude *</label>
+                  <input type="number" id="prov-lat" step="0.00001" value="30.7418" required />
+                </div>
+                <div class="field">
+                  <label for="prov-lng">Selected Longitude *</label>
+                  <input type="number" id="prov-lng" step="0.00001" value="76.7825" required />
+                </div>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label for="prov-unit-cost">Local Unit Rate (₹/kWh) *</label>
+                  <input
+                    type="number"
+                    id="prov-unit-cost"
+                    min="1"
+                    max="100"
+                    step="0.5"
+                    value="8.00"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label for="prov-socket">Socket Type</label>
+                  <select id="prov-socket">
+                    <option value="15A Domestic (3.3 kW)">15A Domestic (3.3 kW)</option>
+                    <option value="7.4 kW AC Wallbox">7.4 kW AC Wallbox</option>
+                  </select>
+                </div>
+              </div>
+
+              <label class="checkbox-row">
+                <input type="checkbox" id="prov-available" checked />
+                <span><strong>Available Now</strong> — Show my pin as ready for emergency charging</span>
+              </label>
+
+              <div id="prov-error-alert" class="alert-error hidden" role="alert"></div>
+
+              <!-- Clicking "Save Address" triggers Gmail OTP modal if not logged in -->
+              <button type="submit" id="btn-save-address" class="btn btn-primary btn-block">
+                💾 Save Address
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================================================================== -->
+  <!-- MODAL 1: TRIGGERED GMAIL + OTP AUTHENTICATION MODAL                  -->
+  <!-- Opens ONLY when user clicks "Contact for Charge", "Save Address",    -->
+  <!-- or "History" while unauthenticated.                                  -->
+  <!-- ==================================================================== -->
+  <div id="modal-auth" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-auth-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow" id="auth-trigger-reason">Authentication Required to Continue</span>
+          <h2 id="modal-auth-title" class="modal-title">Sign In / Sign Up with Gmail OTP</h2>
+        </div>
+        <button type="button" id="btn-close-auth-modal" class="btn-icon" aria-label="Close login modal">✕</button>
+      </div>
+
+      <p class="helper-text">
+        Enter your Gmail or email address to receive a single-use 6-digit verification code. Once verified, your action will complete automatically.
+      </p>
+
+      <form id="form-request-otp" class="auth-step" novalidate>
+        <div class="field">
+          <label for="auth-email-input">Gmail / Email Address *</label>
+          <div class="search-bar">
+            <input
+              type="email"
+              id="auth-email-input"
+              placeholder="yourname@gmail.com"
+              autocomplete="email"
+              required
+            />
+            <button type="submit" id="btn-send-otp" class="btn btn-primary btn-sm">
+              Send OTP
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div id="dev-otp-preview-banner" class="dev-otp-banner hidden" role="note"></div>
+
+      <form id="form-verify-otp" class="auth-step" novalidate>
+        <div class="field">
+          <label for="auth-otp-input">6-Digit OTP Verification Code *</label>
+          <input
+            type="text"
+            id="auth-otp-input"
+            inputmode="numeric"
+            maxlength="6"
+            pattern="[0-9]{6}"
+            placeholder="Enter 6-digit code"
+            required
+          />
+        </div>
+
+        <div id="auth-modal-error" class="alert-error hidden" role="alert"></div>
+
+        <div class="modal-footer">
+          <button type="button" id="btn-cancel-auth-modal" class="btn btn-outline">Cancel</button>
+          <button type="submit" id="btn-verify-otp" class="btn btn-primary">
+            ✅ Verify &amp; Continue
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- MODAL 2: CONTACT FOR CHARGE & PROVIDER NEGOTIATION / PRICE BOOST     -->
+  <!-- Reveals the validated 10-digit phone number to logged-in customer    -->
+  <!-- and allows increasing the price if the provider refuses.             -->
+  <!-- ==================================================================== -->
+  <div id="modal-contact-charge" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-contact-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">Verified Customer Session</span>
+          <h2 id="modal-contact-title" class="modal-title">📞 Contact Provider &amp; Charge</h2>
+        </div>
+        <button type="button" id="btn-close-contact-modal" class="btn-icon" aria-label="Close contact modal">✕</button>
+      </div>
+
+      <div id="contact-host-details" class="host-reveal-panel"></div>
+
+      <!-- Negotiation Box: If provider refuses the calculated amount, increase offer -->
+      <div class="negotiation-panel">
+        <h3 class="sub-heading">🤝 Provider Refused the Calculated Amount? Incentivize with a Higher Offer</h3>
+        <p class="helper-text">
+          If the host is hesitant or busy during peak hours, increase your offered price below to incentivize them to accept your emergency charge.
+        </p>
+
+        <div class="boost-chips">
+          <button type="button" class="btn btn-outline btn-xs btn-quick-boost" data-boost="50">+ ₹50</button>
+          <button type="button" class="btn btn-outline btn-xs btn-quick-boost" data-boost="100">+ ₹100</button>
+          <button type="button" class="btn btn-outline btn-xs btn-quick-boost" data-boost="200">+ ₹200</button>
+        </div>
+
+        <form id="form-boost-offer" class="search-bar" style="margin-top:10px;" novalidate>
+          <label for="input-boost-amount" class="sr-only">New Incentivized Offer in Rupees</label>
+          <input
+            type="number"
+            id="input-boost-amount"
+            min="1"
+            step="10"
+            required
+          />
+          <button type="submit" id="btn-submit-boost" class="btn btn-primary btn-sm">
+            🚀 Update Incentivized Offer
+          </button>
+        </form>
+        <div id="boost-feedback-msg" class="boost-feedback hidden" role="status"></div>
+      </div>
+
+      <div class="safety-checklist">
+        <strong>⚡ Roadside Charging Safety Checklist:</strong>
+        Verify proper earthing on the 15A socket, avoid uncoiled extension cords for loads over 10A, and settle the agreed amount directly with the host via UPI or cash.
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-done-contact-modal" class="btn btn-secondary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- MODAL 3: ACCOUNT HISTORY MODAL (Customer & Provider Activity)        -->
+  <!-- ==================================================================== -->
+  <div id="modal-history" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-history-title">
+    <div class="modal-card modal-wide">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">Dual-Role Activity Log</span>
+          <h2 id="modal-history-title" class="modal-title">📜 Charging &amp; Hosting History</h2>
+        </div>
+        <button type="button" id="btn-close-history-modal" class="btn-icon" aria-label="Close history modal">✕</button>
+      </div>
+
+      <div class="history-columns">
+        <div>
+          <h3 class="sub-heading">🚗 My Requests (As Customer)</h3>
+          <div id="history-customer-list" class="history-list"></div>
+        </div>
+        <div>
+          <h3 class="sub-heading">🔌 Incoming Calls/Requests (As Provider)</h3>
+          <div id="history-provider-list" class="history-list"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-done-history-modal" class="btn btn-outline">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- MODAL 4: STRICT DELETE ACCOUNT WARNING MODAL                         -->
+  <!-- Shows exact warning: "This account and all data will be permanently  -->
+  <!-- deleted." and deletes on clicking OK.                                -->
+  <!-- ==================================================================== -->
+  <div id="modal-delete-warning" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-delete-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-delete-title" class="modal-title">⚠️ Confirm Account Deletion</h2>
+        <button type="button" id="btn-close-delete-modal" class="btn-icon" aria-label="Close delete modal">✕</button>
+      </div>
+
+      <div class="strict-delete-warning">
+        <p><strong>This account and all data will be permanently deleted.</strong></p>
+        <p class="helper-text" style="margin-bottom:0;">
+          Your verified email, saved provider address, and all charging history records will be immediately erased from the database.
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-cancel-delete-account" class="btn btn-outline">Cancel</button>
+        <button type="button" id="btn-ok-delete-account" class="btn btn-danger">
+          OK — Delete Permanently
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="/app.js"></script>
+</body>
+</html>
