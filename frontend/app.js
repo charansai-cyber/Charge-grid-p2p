@@ -288,15 +288,58 @@
     }
   }
 
-  async function loadCommercialStations() {
+async function loadCommercialStations() {
     const lat = state.centerLat;
     const lng = state.centerLng;
+    $('osm-station-status').textContent = 'Searching real live OpenStreetMap EV stations...';
+
+    const query = `[out:json][timeout:12];(node["amenity"="charging_station"](around:50000,${lat},${lng});way["amenity"="charging_station"](around:50000,${lat},${lng}););out center 25;`;
     try {
-      const data = await apiRequest(
-        `/api/ev-stations/nearby?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`
-      );
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: `data=${encodeURIComponent(query)}`
+      });
+      const osmData = await res.json();
+      const elements = Array.isArray(osmData.elements) ? osmData.elements : [];
+      if (elements.length > 0) {
+        const toRad = (d) => (d * Math.PI) / 180;
+        const calcDist = (lat2, lng2) => {
+          const a = Math.sin(toRad(lat2 - lat) / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(lat2)) * Math.sin(toRad(lng2 - lng) / 2) ** 2;
+          return Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 100) / 100;
+        };
+        state.commercialStations = elements
+          .map((el) => {
+            const sLat = el.lat || (el.center && el.center.lat);
+            const sLng = el.lon || (el.center && el.center.lon);
+            if (!Number.isFinite(sLat) || !Number.isFinite(sLng)) return null;
+            const t = el.tags || {};
+            return {
+              id: `osm-${el.id}`,
+              station_name: t.name || t.operator || t.brand || 'Live OpenStreetMap EV Station',
+              operator: t.operator || t.brand || 'Public EV Network (Live OSM)',
+              address: [t['addr:street'], t['addr:city']].filter(Boolean).join(', ') || `GPS: ${sLat.toFixed(4)}, ${sLng.toFixed(4)}`,
+              lat: sLat,
+              lng: sLng,
+              connectors: t['socket:ccs'] ? 'CCS2 DC Fast' : t['socket:type2'] ? 'Type-2 AC' : 'Public EV Charger',
+              power_kw: 50,
+              tariff_inr_per_kwh: 18.0,
+              hours: t.opening_hours || '24/7 Open',
+              distance_km: calcDist(sLat, sLng)
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => a.distance_km - b.distance_km);
+        $('osm-station-status').textContent = `Showing ${state.commercialStations.length} real live EV station(s) from OpenStreetMap`;
+        renderCommercialStationsAndMarkers();
+        return;
+      }
+    } catch (_e) {}
+
+    // Fallback if no OSM stations are mapped in a rural village
+    try {
+      const data = await apiRequest(`/api/ev-stations/nearby?lat=${lat}&lng=${lng}`);
       state.commercialStations = data.stations || [];
-      $('osm-station-status').textContent = `Loaded ${state.commercialStations.length} nearby EV charging stations`;
     } catch (_e) {
       state.commercialStations = [];
     }
