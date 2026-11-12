@@ -293,7 +293,7 @@ async function loadCommercialStations() {
     const lng = state.centerLng;
     $('osm-station-status').textContent = 'Searching real live OpenStreetMap EV stations...';
 
-    const query = `[out:json][timeout:12];(node["amenity"="charging_station"](around:50000,${lat},${lng});way["amenity"="charging_station"](around:50000,${lat},${lng}););out center 25;`;
+    const query = `[out:json][timeout:15];(node["amenity"="charging_station"](around:150000,${lat},${lng});way["amenity"="charging_station"](around:150000,${lat},${lng}););out center 40;`;
     try {
       const res = await fetch('https://overpass-api.de/api/interpreter', {
         method: 'POST',
