@@ -989,11 +989,25 @@ async function loadCommercialStations() {
       }
     });
 
-    // Trigger 3: "History" in Top-Right Account Menu
-    $('menu-btn-history').addEventListener('click', () => {
+    // Direct "Login / Sign Up" option in Top-Right Account Menu
+  if ($('menu-btn-login')) {
+    $('menu-btn-login').addEventListener('click', () => {
       $('account-dropdown-menu').classList.add('hidden');
-      requireTriggeredAuth('History', () => executeOpenHistory());
+      if (state.authenticated && state.user) {
+        showToast(`You are already logged in as ${state.user.email}.`);
+        return;
+      }
+      requireTriggeredAuth('Account Login', () => {
+        showToast('Successfully logged in!');
+      });
     });
+  }
+
+  // Trigger 3: "History" in Top-Right Account Menu
+  $('menu-btn-history').addEventListener('click', () => {
+    $('account-dropdown-menu').classList.add('hidden');
+    requireTriggeredAuth('History', () => executeOpenHistory());
+  });
 
     // Account Menu: "Logout"
     $('menu-btn-logout').addEventListener('click', async () => {
