@@ -371,20 +371,7 @@ const evStationCache = new Map();
       $('osm-station-status').textContent = `Showing ${instantList.length} EV station(s) within 150 km`;
     }
   }
-        return;
-      }
-    } catch (_e) {}
-
-    // Fallback if no OSM stations are mapped in a rural village
-    try {
-      const data = await apiRequest(`/api/ev-stations/nearby?lat=${lat}&lng=${lng}`);
-      state.commercialStations = data.stations || [];
-    } catch (_e) {
-      state.commercialStations = [];
-    }
-    renderCommercialStationsAndMarkers();
-  }
-
+       
   function renderCommercialStationsAndMarkers() {
     const listEl = $('ev-stations-list-container');
     const connectorFilter = $('select-station-connector') ? $('select-station-connector').value : 'all';
